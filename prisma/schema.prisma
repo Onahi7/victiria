@@ -1,0 +1,396 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  avatar            String?
+  role              Role     @default(MEMBER)
+  emailVerified     DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  accounts          Account[]
+  sessions          Session[]
+  orders            Order[]
+  blogPosts         BlogPost[]
+  discussions       Discussion[]
+  discussionReplies DiscussionReply[]
+  events            Event[]
+  enrollments       Enrollment[]
+  communityMember   CommunityMember?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+enum Role {
+  ADMIN
+  MODERATOR
+  MEMBER
+  GUEST
+}
+
+// Books & Products
+model Book {
+  id          String      @id @default(cuid())
+  title       String
+  description String      @db.Text
+  price       Decimal     @db.Decimal(10, 2)
+  coverImage  String?
+  status      BookStatus  @default(DRAFT)
+  category    String?
+  badge       String?
+  rating      Decimal?    @db.Decimal(2, 1)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  orderItems  OrderItem[]
+  bookTags    BookTag[]
+
+  @@map("books")
+}
+
+model BookCategory {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String?
+  slug        String @unique
+
+  @@map("book_categories")
+}
+
+model Tag {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  
+  bookTags BookTag[]
+  postTags PostTag[]
+
+  @@map("tags")
+}
+
+model BookTag {
+  bookId String
+  tagId  String
+  
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, tagId])
+  @@map("book_tags")
+}
+
+enum BookStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+// Orders & Payments
+model Order {
+  id            String      @id @default(cuid())
+  userId        String
+  total         Decimal     @db.Decimal(10, 2)
+  status        OrderStatus @default(PENDING)
+  paymentMethod String?
+  paymentId     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id])
+  orderItems   OrderItem[]
+  transactions Transaction[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String  @id @default(cuid())
+  orderId  String
+  bookId   String
+  quantity Int     @default(1)
+  price    Decimal @db.Decimal(10, 2)
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  book  Book  @relation(fields: [bookId], references: [id])
+
+  @@map("order_items")
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  orderId         String
+  paymentProvider PaymentProvider
+  externalId      String
+  amount          Decimal           @db.Decimal(10, 2)
+  status          TransactionStatus @default(PENDING)
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("transactions")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+// Blog & Content
+model BlogPost {
+  id          String      @id @default(cuid())
+  title       String
+  content     String      @db.Text
+  excerpt     String?
+  coverImage  String?
+  status      PostStatus  @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  authorId    String
+
+  // Relations
+  author   User      @relation(fields: [authorId], references: [id])
+  postTags PostTag[]
+
+  @@map("blog_posts")
+}
+
+model PostCategory {
+  id          String @id @default(cuid())
+  name        String @unique
+  slug        String @unique
+  description String?
+
+  @@map("post_categories")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+  
+  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("post_tags")
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  SCHEDULED
+}
+
+// Community
+model CommunityMember {
+  userId   String   @id
+  joinedAt DateTime @default(now())
+  role     CommunityRole @default(MEMBER)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("community_members")
+}
+
+model Discussion {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.Text
+  authorId  String
+  isPinned  Boolean  @default(false)
+  isLocked  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  author  User              @relation(fields: [authorId], references: [id])
+  replies DiscussionReply[]
+
+  @@map("discussions")
+}
+
+model DiscussionReply {
+  id           String   @id @default(cuid())
+  discussionId String
+  content      String   @db.Text
+  authorId     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  discussion Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  author     User       @relation(fields: [authorId], references: [id])
+
+  @@map("discussion_replies")
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @db.Text
+  date        DateTime
+  location    String?
+  isOnline    Boolean   @default(false)
+  maxAttendees Int?
+  organizerId String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  organizer User @relation(fields: [organizerId], references: [id])
+
+  @@map("events")
+}
+
+enum CommunityRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+// Courses & Academy
+model Course {
+  id           String   @id @default(cuid())
+  title        String
+  description  String   @db.Text
+  price        Decimal? @db.Decimal(10, 2)
+  coverImage   String?
+  instructorId String
+  isPublished  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  instructor  User         @relation(fields: [instructorId], references: [id])
+  modules     CourseModule[]
+  enrollments Enrollment[]
+
+  @@map("courses")
+}
+
+model CourseModule {
+  id        String   @id @default(cuid())
+  courseId  String
+  title     String
+  content   String   @db.Text
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("course_modules")
+}
+
+model Enrollment {
+  userId     String
+  courseId   String
+  enrolledAt DateTime @default(now())
+  progress   Int      @default(0)
+  completed  Boolean  @default(false)
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@id([userId, courseId])
+  @@map("enrollments")
+}
+
+// Newsletter & Email
+model NewsletterSubscriber {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  isActive    Boolean  @default(true)
+  subscribedAt DateTime @default(now())
+
+  @@map("newsletter_subscribers")
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  subject   String
+  content   String   @db.Text
+  variables Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("email_templates")
+}
