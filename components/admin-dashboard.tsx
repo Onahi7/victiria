@@ -11,6 +11,9 @@ import AdminBooksManagement from '@/components/admin-books-management'
 import AdminCoursesManagement from '@/components/admin-courses-management'
 import AdminBlogManagement from '@/components/admin-blog-management'
 import AdminAnalytics from '@/components/admin-analytics'
+import AdminCouponsManagement from '@/components/admin-coupons-management'
+import AdminPreordersManagement from '@/components/admin-preorders-management'
+import AdminFreeDownloadsManagement from '@/components/admin-free-downloads-management'
 
 interface DashboardStats {
   users: {
@@ -226,12 +229,15 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 h-auto">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 h-auto">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           <TabsTrigger value="events" className="text-xs sm:text-sm">Events</TabsTrigger>
           <TabsTrigger value="books" className="text-xs sm:text-sm">Books</TabsTrigger>
           <TabsTrigger value="academy" className="text-xs sm:text-sm">Academy</TabsTrigger>
           <TabsTrigger value="blog" className="text-xs sm:text-sm">Blog</TabsTrigger>
+          <TabsTrigger value="coupons" className="text-xs sm:text-sm">Coupons</TabsTrigger>
+          <TabsTrigger value="preorders" className="text-xs sm:text-sm">Preorders</TabsTrigger>
+          <TabsTrigger value="free-downloads" className="text-xs sm:text-sm">Free Downloads</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
         </TabsList>
 
@@ -345,6 +351,18 @@ export default function AdminDashboard() {
 
         <TabsContent value="blog">
           <AdminBlogManagement />
+        </TabsContent>
+
+        <TabsContent value="coupons">
+          <AdminCouponsManagement />
+        </TabsContent>
+
+        <TabsContent value="preorders">
+          <AdminPreordersManagement />
+        </TabsContent>
+
+        <TabsContent value="free-downloads">
+          <AdminFreeDownloadsManagement />
         </TabsContent>
 
         <TabsContent value="analytics">

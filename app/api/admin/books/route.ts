@@ -164,6 +164,8 @@ export async function POST(request: NextRequest) {
       description,
       excerpt,
       price,
+      priceUsd,
+      priceNgn,
       coverImage,
       category,
       tags,
@@ -173,8 +175,38 @@ export async function POST(request: NextRequest) {
       isbn,
       pageCount,
       language,
-      royaltyRate
+      royaltyRate,
+      isFree
     } = body
+
+    // Generate slug from title
+    const generateSlug = (title: string): string => {
+      return title
+        .toLowerCase()
+        .replace(/[^a-z0-9 -]/g, '') // Remove special characters
+        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+        .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+        .trim()
+    }
+
+    let slug = generateSlug(title)
+    
+    // Ensure slug is unique
+    let slugCounter = 0
+    const originalSlug = slug
+    while (true) {
+      const existingSlugBook = await db
+        .select()
+        .from(books)
+        .where(eq(books.slug, slug))
+        .limit(1)
+      
+      if (existingSlugBook.length === 0) break
+      
+      slugCounter++
+      slug = `${originalSlug}-${slugCounter}`
+    }
 
     const newBook = await db.insert(books).values({
       title,
@@ -182,23 +214,29 @@ export async function POST(request: NextRequest) {
       authorId: authorId || null,
       description,
       excerpt,
-      price: price.toString(),
+      price: price?.toString() || '0.00', // Legacy field
+      priceUsd: priceUsd !== null ? priceUsd.toString() : null, // USD price if provided
+      priceNgn: priceNgn !== null ? priceNgn.toString() : null, // NGN price if provided
       coverImage,
       status: 'published',
       category,
       tags: tags || [],
       stock: stock || 0,
       isAvailable: true,
+      isFree: isFree || false,
       digitalDownload,
       bookFile,
       isbn,
       pageCount,
       language: language || 'English',
       royaltyRate: royaltyRate ? royaltyRate.toString() : '70.00',
+      slug: slug, // Add the generated slug
       publishedAt: new Date(),
       salesCount: 0,
       totalRevenue: '0.00',
-      authorRevenue: '0.00'
+      authorRevenue: '0.00',
+      createdAt: new Date(),
+      updatedAt: new Date()
     }).returning()
 
     return NextResponse.json({

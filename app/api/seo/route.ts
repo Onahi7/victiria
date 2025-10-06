@@ -1,23 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { SEOService } from '@/lib/seo/service'
-import { PAGE_TYPES } from '@/lib/seo/config'
+import { seoService } from '@/lib/seo/service'
+import { PAGE_TYPES, type PageType } from '@/lib/seo/config'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const page = searchParams.get('page')
-    const type = searchParams.get('type') as PAGE_TYPES
+    const typeParam = searchParams.get('type')
     const id = searchParams.get('id') // For dynamic pages like book/:id
 
-    if (!page || !type) {
+    if (!page || !typeParam) {
       return NextResponse.json(
         { error: 'Missing required parameters: page and type' },
         { status: 400 }
       )
     }
 
-    const seoService = new SEOService()
-    const seoData = await seoService.getPageSEO(page, type, id)
+    // Validate that type is a valid PageType
+    const validTypes = Object.values(PAGE_TYPES)
+    if (!validTypes.includes(typeParam as any)) {
+      return NextResponse.json(
+        { error: 'Invalid page type' },
+        { status: 400 }
+      )
+    }
+
+    const type = typeParam as PageType
+    const seoData = await seoService.getPageSEO(type, page, id ? { id } : undefined)
 
     return NextResponse.json(seoData)
   } catch (error) {
@@ -41,7 +50,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const seoService = new SEOService()
     await seoService.upsertSEOSettings(page, type, seoData)
 
     return NextResponse.json({ success: true })
@@ -66,7 +74,6 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const seoService = new SEOService()
     await seoService.deleteSEOSettings(page)
 
     return NextResponse.json({ success: true })

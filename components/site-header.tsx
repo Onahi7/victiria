@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useState } from "react"
 import { MainNav } from "@/components/main-nav"
 import { UserNav } from "@/components/user-nav"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Icons } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
 
@@ -19,9 +19,16 @@ export function SiteHeader() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
-              <Icons.godfluence className="h-6 w-6 lg:h-8 lg:w-8 text-gold" />
+              <Image 
+                src="/logo.png" 
+                alt="EdifyPub Logo" 
+                width={40} 
+                height={40}
+                className="h-8 w-8 lg:h-10 lg:w-10"
+                priority
+              />
               <span className="font-bold text-lg lg:text-xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                Godfluence Media
+                EdifyPub
               </span>
             </Link>
           </div>

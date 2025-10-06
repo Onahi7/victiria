@@ -253,6 +253,91 @@ export class EmailService {
   }
 
   /**
+   * Send newsletter welcome email
+   */
+  static async sendNewsletterWelcome({
+    email,
+    userName = 'Writer'
+  }: {
+    email: string
+    userName?: string
+  }) {
+    const subject = `Welcome to DIFY Academy Newsletter! 📚`
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Welcome to DIFY Academy Newsletter</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #8B5CF6, #EC4899); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
+          .button { display: inline-block; background: #8B5CF6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+          .feature { background: white; margin: 15px 0; padding: 20px; border-radius: 8px; border-left: 4px solid #8B5CF6; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Welcome to DIFY Academy!</h1>
+            <p>Your journey to better writing starts here</p>
+          </div>
+          <div class="content">
+            <p>Hi ${userName},</p>
+            
+            <p>Thank you for subscribing to the DIFY Academy newsletter! You've just joined a community of passionate writers who are committed to improving their craft.</p>
+            
+            <h3>What to Expect:</h3>
+            
+            <div class="feature">
+              <h4>📚 Weekly Writing Tips</h4>
+              <p>Practical advice to improve your writing skills, from grammar basics to advanced storytelling techniques.</p>
+            </div>
+            
+            <div class="feature">
+              <h4>🎯 Course Updates</h4>
+              <p>Be the first to know about new courses, instructor spotlights, and exclusive early-bird discounts.</p>
+            </div>
+            
+            <div class="feature">
+              <h4>✍️ Community Highlights</h4>
+              <p>Success stories, featured works, and inspiration from fellow writers in our community.</p>
+            </div>
+            
+            <div class="feature">
+              <h4>📖 Book Recommendations</h4>
+              <p>Curated reading lists and reviews of books that will inspire and improve your writing.</p>
+            </div>
+            
+            <p>Ready to start your writing journey? Explore our courses and resources:</p>
+            
+            <a href="${process.env.NEXT_PUBLIC_APP_URL}/academy" class="button">
+              Explore Courses
+            </a>
+            
+            <p>If you have any questions or need help getting started, don't hesitate to reach out to us at <a href="mailto:support@difyacademy.com">support@difyacademy.com</a></p>
+            
+            <p>Happy writing!</p>
+            <p><strong>The DIFY Academy Team</strong></p>
+          </div>
+          <div class="footer">
+            <p>© 2025 DIFY Academy. All rights reserved.</p>
+            <p>You received this email because you subscribed to our newsletter.</p>
+            <p><a href="${process.env.NEXT_PUBLIC_APP_URL}/api/newsletter/unsubscribe?email=${encodeURIComponent(email)}">Unsubscribe</a></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    return this.sendEmail({ to: email, subject, html })
+  }
+
+  /**
    * Send generic email
    */
   private static async sendEmail({ to, subject, html }: EmailTemplate) {

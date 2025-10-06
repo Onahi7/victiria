@@ -27,7 +27,6 @@ export default function SEOTracking({
           pageTitle: pageTitle || document.title,
           referrer: document.referrer,
           userAgent: navigator.userAgent,
-          screenResolution: `${screen.width}x${screen.height}`,
           sessionId: sessionId || generateSessionId(),
           userId: userId || null,
           timestamp: new Date().toISOString(),

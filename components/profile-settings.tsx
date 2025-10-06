@@ -153,7 +153,7 @@ export default function ProfileSettings() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/profile', {
+      const response = await fetch('/api/users/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -207,7 +207,7 @@ export default function ProfileSettings() {
     setIsChangingPassword(true)
 
     try {
-      const response = await fetch('/api/profile/password', {
+      const response = await fetch('/api/users/password', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -254,7 +254,7 @@ export default function ProfileSettings() {
     formData.append('avatar', file)
 
     try {
-      const response = await fetch('/api/profile/avatar', {
+      const response = await fetch('/api/users/avatar', {
         method: 'POST',
         body: formData,
       })

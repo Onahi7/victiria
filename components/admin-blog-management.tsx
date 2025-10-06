@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import TiptapEditor from '@/components/tiptap-editor'
 import { 
   Dialog, 
   DialogContent, 
@@ -94,6 +95,8 @@ export default function AdminBlogManagement() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [formData, setFormData] = useState<BlogPostFormData>({
     title: '',
     content: '',
@@ -115,17 +118,62 @@ export default function AdminBlogManagement() {
     fetchPosts()
   }, [])
 
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('folder', 'blog-covers')
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image')
+    }
+
+    const { data } = await response.json()
+    return data.url
+  }
+
+  const handleImageUpload = async (file: File, setter: (url: string) => void) => {
+    setUploading(true)
+    try {
+      const imageUrl = await uploadImage(file)
+      setter(imageUrl)
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully!"
+      })
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive"
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const fetchPosts = async () => {
     try {
       const response = await fetch('/api/admin/blog')
       if (!response.ok) throw new Error('Failed to fetch posts')
       
       const data = await response.json()
-      if (data.success) {
+      if (data.success && data.data && Array.isArray(data.data.posts)) {
+        setPosts(data.data.posts)
+      } else if (data.success && Array.isArray(data.data)) {
+        // Fallback for direct array response
         setPosts(data.data)
+      } else {
+        setPosts([])
       }
     } catch (error) {
       console.error('Error fetching posts:', error)
+      setPosts([]) // Ensure posts is always an array
       toast({
         title: "Error",
         description: "Failed to load blog posts",
@@ -140,6 +188,24 @@ export default function AdminBlogManagement() {
     e.preventDefault()
     
     try {
+      let finalFormData = { ...formData }
+      
+      // If there's a cover image file to upload and no URL set yet
+      if (coverImageFile && !formData.coverImage) {
+        try {
+          const coverImageUrl = await uploadImage(coverImageFile)
+          finalFormData.coverImage = coverImageUrl
+        } catch (error) {
+          console.error('Error uploading cover image:', error)
+          toast({
+            title: "Error",
+            description: "Failed to upload cover image",
+            variant: "destructive"
+          })
+          return
+        }
+      }
+      
       const url = selectedPost ? `/api/admin/blog/${selectedPost.id}` : '/api/admin/blog'
       const method = selectedPost ? 'PUT' : 'POST'
       
@@ -148,7 +214,7 @@ export default function AdminBlogManagement() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(finalFormData),
       })
 
       if (!response.ok) throw new Error('Failed to save post')
@@ -217,6 +283,8 @@ export default function AdminBlogManagement() {
     })
     setTagInput('')
     setSelectedPost(null)
+    setCoverImageFile(null)
+    setUploading(false)
   }
 
   const openEditDialog = (post: BlogPost) => {
@@ -261,14 +329,14 @@ export default function AdminBlogManagement() {
     }
   }
 
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPosts = Array.isArray(posts) ? posts.filter(post => {
+    const matchesSearch = post.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         post.excerpt?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || post.status === statusFilter
     const matchesCategory = categoryFilter === 'all' || post.category === categoryFilter
     
     return matchesSearch && matchesStatus && matchesCategory
-  })
+  }) : []
 
   const PostForm = () => (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -310,13 +378,44 @@ export default function AdminBlogManagement() {
           </div>
           
           <div>
-            <Label htmlFor="coverImage">Cover Image URL</Label>
-            <Input
-              id="coverImage"
-              value={formData.coverImage}
-              onChange={(e) => setFormData(prev => ({ ...prev, coverImage: e.target.value }))}
-              placeholder="https://example.com/image.jpg"
-            />
+            <Label htmlFor="coverImage">Cover Image</Label>
+            <div className="space-y-2">
+              <Input
+                id="coverImage"
+                value={formData.coverImage}
+                onChange={(e) => setFormData(prev => ({ ...prev, coverImage: e.target.value }))}
+                placeholder="https://example.com/image.jpg"
+              />
+              <div className="text-center text-muted-foreground">OR</div>
+              <div className="flex gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setCoverImageFile(file)
+                      handleImageUpload(file, (url) => {
+                        setFormData(prev => ({ ...prev, coverImage: url }))
+                      })
+                    }
+                  }}
+                  disabled={uploading}
+                />
+                {uploading && <span className="text-sm">Uploading...</span>}
+              </div>
+              {formData.coverImage && (
+                <div className="mt-2">
+                  <Image
+                    src={formData.coverImage}
+                    alt="Cover preview"
+                    width={200}
+                    height={120}
+                    className="rounded object-cover"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           
           <div>
@@ -383,12 +482,9 @@ export default function AdminBlogManagement() {
       
       <div>
         <Label htmlFor="content">Content *</Label>
-        <Textarea
-          id="content"
-          value={formData.content}
-          onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-          rows={12}
-          required
+        <TiptapEditor
+          content={formData.content}
+          onChange={(content) => setFormData(prev => ({ ...prev, content }))}
           placeholder="Write your blog post content here..."
         />
       </div>

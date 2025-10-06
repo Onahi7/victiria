@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { seoSettings, seoRedirects, seoAnalytics, seoMetrics, seoKeywords, seoSitemaps } from './schema'
+import { seoSettings, seoRedirects, seoAnalytics, seoMetrics, seoKeywords, seoSitemaps } from '@/lib/db/schema'
 import { eq, and, desc, asc, sql } from 'drizzle-orm'
 import { defaultSEOConfig, interpolateTemplate, generateSEOTags, type SEOData, type PageType } from './config'
 
@@ -51,19 +51,19 @@ class SEOService {
         return {
           title,
           description,
-          keywords: setting.keywords || [],
+          keywords: setting.keywords ? JSON.parse(setting.keywords as string) : [],
           canonicalUrl: setting.canonicalUrl || undefined,
-          ogTitle,
-          ogDescription,
+          ogTitle: setting.ogTitle || undefined,
+          ogDescription: setting.ogDescription || undefined,
           ogImage: setting.ogImage || undefined,
           ogType: setting.ogType as any,
           twitterCard: setting.twitterCard as any,
           twitterSite: setting.twitterSite || undefined,
           twitterCreator: setting.twitterCreator || undefined,
-          robotsIndex: setting.robotsIndex,
-          robotsFollow: setting.robotsFollow,
-          structuredData: setting.structuredData || undefined,
-          priority: parseFloat(setting.priority),
+          robotsIndex: setting.robotsIndex ?? true,
+          robotsFollow: setting.robotsFollow ?? true,
+          structuredData: setting.structuredData ? JSON.parse(setting.structuredData as string) : undefined,
+          priority: parseFloat(setting.priority || '0.5'),
           changeFreq: setting.changeFreq as any,
           lastModified: setting.lastModified || undefined,
         }
@@ -162,14 +162,18 @@ class SEOService {
     ipAddress?: string
     country?: string
     city?: string
-    searchQuery?: string
     sessionId?: string
     userId?: string
     deviceType?: string
-    browserName?: string
-    osName?: string
-    screenResolution?: string
-    visitDuration?: number
+    browser?: string
+    os?: string
+    timeOnPage?: number
+    scrollDepth?: number
+    utmSource?: string
+    utmMedium?: string
+    utmCampaign?: string
+    utmTerm?: string
+    utmContent?: string
   }) {
     try {
       await db.insert(seoAnalytics).values({
@@ -180,14 +184,18 @@ class SEOService {
         ipAddress: data.ipAddress || null,
         country: data.country || null,
         city: data.city || null,
-        searchQuery: data.searchQuery || null,
         sessionId: data.sessionId || null,
         userId: data.userId || null,
         deviceType: data.deviceType || null,
-        browserName: data.browserName || null,
-        osName: data.osName || null,
-        screenResolution: data.screenResolution || null,
-        visitDuration: data.visitDuration || 0,
+        browser: data.browser || null,
+        os: data.os || null,
+        timeOnPage: data.timeOnPage || 0,
+        scrollDepth: data.scrollDepth || 0,
+        utmSource: data.utmSource || null,
+        utmMedium: data.utmMedium || null,
+        utmCampaign: data.utmCampaign || null,
+        utmTerm: data.utmTerm || null,
+        utmContent: data.utmContent || null,
       })
     } catch (error) {
       console.error('Error tracking page view:', error)
@@ -297,7 +305,7 @@ class SEOService {
     try {
       let query = db.select().from(seoAnalytics)
 
-      const conditions = []
+      const conditions: any[] = []
       if (pageUrl) {
         conditions.push(eq(seoAnalytics.pageUrl, pageUrl))
       }
@@ -309,12 +317,14 @@ class SEOService {
       }
 
       if (conditions.length > 0) {
-        query = query.where(and(...conditions))
+        query = query.where(and(...conditions)) as any
       }
 
-      return await query
+      const result = await query
         .orderBy(desc(seoAnalytics.createdAt))
         .limit(limit)
+
+      return result
     } catch (error) {
       console.error('Error getting analytics:', error)
       return []
@@ -350,7 +360,7 @@ class SEOService {
     try {
       await db
         .delete(seoSettings)
-        .where(eq(seoSettings.id, id))
+        .where(eq(seoSettings.id, parseInt(id)))
     } catch (error) {
       console.error('Error deleting SEO settings:', error)
       throw error

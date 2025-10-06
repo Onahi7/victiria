@@ -17,12 +17,13 @@ const updateBookSchema = z.object({
 // GET /api/books/[id] - Get single book
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const book = await db.select()
       .from(books)
-      .where(eq(books.id, params.id))
+      .where(eq(books.id, id))
       .limit(1)
 
     if (!book.length) {
@@ -48,7 +49,7 @@ export async function GET(
 // PUT /api/books/[id] - Update book (admin only)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -60,6 +61,7 @@ export async function PUT(
       )
     }
 
+    const { id } = await params
     const body = await request.json()
     const bookData = updateBookSchema.parse(body)
 
@@ -68,7 +70,7 @@ export async function PUT(
         ...bookData,
         updatedAt: new Date(),
       })
-      .where(eq(books.id, params.id))
+      .where(eq(books.id, id))
       .returning()
 
     if (!updatedBook.length) {
@@ -101,7 +103,7 @@ export async function PUT(
 // DELETE /api/books/[id] - Delete book (admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -113,8 +115,9 @@ export async function DELETE(
       )
     }
 
+    const { id } = await params
     const deletedBook = await db.delete(books)
-      .where(eq(books.id, params.id))
+      .where(eq(books.id, id))
       .returning()
 
     if (!deletedBook.length) {

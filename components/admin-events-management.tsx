@@ -106,6 +106,8 @@ export default function AdminEventsManagement() {
   const [editing, setEditing] = useState<string | null>(null)
   const [formData, setFormData] = useState<EventFormData>(initialFormData)
   const [showForm, setShowForm] = useState(false)
+  const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const { data: session } = useSession()
 
   useEffect(() => {
@@ -133,6 +135,46 @@ export default function AdminEventsManagement() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const uploadFormData = new FormData()
+    uploadFormData.append('file', file)
+    uploadFormData.append('folder', 'event-banners')
+    
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: uploadFormData
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to upload image')
+    }
+    
+    const result = await response.json()
+    return result.data.url
+  }
+
+  const handleImageUpload = async (file: File) => {
+    try {
+      setUploading(true)
+      const imageUrl = await uploadImage(file)
+      setFormData(prev => ({ ...prev, bannerImage: imageUrl }))
+      
+      toast({
+        title: "Success",
+        description: "Banner image uploaded successfully",
+      })
+    } catch (error) {
+      console.error('Upload error:', error)
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive"
+      })
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -164,18 +206,39 @@ export default function AdminEventsManagement() {
     setCreating(true)
 
     try {
+      let finalFormData = { ...formData }
+      
+      // Upload banner image if a file is selected and no URL is set
+      if (bannerFile && !formData.bannerImage) {
+        try {
+          setUploading(true)
+          const bannerImageUrl = await uploadImage(bannerFile)
+          finalFormData.bannerImage = bannerImageUrl
+        } catch (error) {
+          console.error('Error uploading banner image:', error)
+          toast({
+            title: "Upload Error",
+            description: "Failed to upload banner image",
+            variant: "destructive"
+          })
+          return
+        } finally {
+          setUploading(false)
+        }
+      }
+      
       const url = isEditing ? '/api/admin/events' : '/api/admin/events'
       const method = isEditing ? 'PUT' : 'POST'
 
       const payload = {
-        ...formData,
+        ...finalFormData,
         ...(isEditing && { id: editing }),
-        maxAttendees: formData.maxAttendees ? parseInt(formData.maxAttendees) : null,
-        price: formData.isFree ? '0' : formData.price,
-        registrationDeadline: formData.registrationDeadline || null,
-        endDate: formData.endDate || null,
-        location: formData.isOnline ? null : formData.location,
-        meetingUrl: formData.isOnline ? formData.meetingLink : null
+        maxAttendees: finalFormData.maxAttendees ? parseInt(finalFormData.maxAttendees) : null,
+        price: finalFormData.isFree ? '0' : finalFormData.price,
+        registrationDeadline: finalFormData.registrationDeadline || null,
+        endDate: finalFormData.endDate || null,
+        location: finalFormData.isOnline ? null : finalFormData.location,
+        meetingUrl: finalFormData.isOnline ? finalFormData.meetingLink : null
       }
 
       const response = await fetch(url, {
@@ -197,6 +260,8 @@ export default function AdminEventsManagement() {
         setShowForm(false)
         setEditing(null)
         setFormData(initialFormData)
+        setBannerFile(null)
+        setUploading(false)
         fetchEvents()
       } else {
         toast({
@@ -324,6 +389,8 @@ export default function AdminEventsManagement() {
               onClick={() => {
                 setFormData(initialFormData)
                 setEditing(null)
+                setBannerFile(null)
+                setUploading(false)
                 setShowForm(true)
               }}
               className="flex items-center gap-2"
@@ -527,14 +594,52 @@ export default function AdminEventsManagement() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="bannerImage">Banner Image URL</Label>
-                <Input
-                  id="bannerImage"
-                  value={formData.bannerImage}
-                  onChange={(e) => handleInputChange('bannerImage', e.target.value)}
-                  placeholder="URL to event banner image"
-                />
+              <div className="space-y-4">
+                <Label>Banner Image</Label>
+                
+                {/* File Upload Option */}
+                <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                  {formData.bannerImage ? (
+                    <div className="space-y-2">
+                      <img 
+                        src={formData.bannerImage} 
+                        alt="Banner preview" 
+                        className="max-w-full h-32 object-cover mx-auto rounded"
+                      />
+                      <p className="text-sm text-green-600">Banner image uploaded successfully</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Upload className="h-8 w-8 mx-auto text-gray-400" />
+                      <p className="text-gray-500">Upload banner image</p>
+                    </div>
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setBannerFile(file)
+                        handleImageUpload(file)
+                      }
+                    }}
+                    className="mt-2"
+                    disabled={uploading}
+                  />
+                  {uploading && <p className="text-blue-500 mt-2">Uploading...</p>}
+                </div>
+
+                {/* Manual URL Option */}
+                <div className="space-y-2">
+                  <Label htmlFor="bannerImage">Or enter image URL manually</Label>
+                  <Input
+                    id="bannerImage"
+                    value={formData.bannerImage}
+                    onChange={(e) => handleInputChange('bannerImage', e.target.value)}
+                    placeholder="https://example.com/banner.jpg"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

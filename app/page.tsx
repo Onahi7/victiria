@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BookOpen, Pen, GraduationCap, ArrowRight, Sparkles, Upload, Star } from "lucide-react"
 import EventsSection from "@/components/events-section"
 import BlogSection from "@/components/blog-section"
+import { BooksAccordion } from "@/components/books-accordion"
 
 export default function Home() {
   return (
@@ -97,6 +98,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Books Accordion Section */}
+      <BooksAccordion />
 
       {/* Blog Section */}
       <BlogSection />

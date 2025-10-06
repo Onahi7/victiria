@@ -6,22 +6,8 @@ export default withAuth(
     const { pathname } = req.nextUrl
     const token = req.nextauth.token
 
-    // Check for SEO redirects first
-    try {
-      const redirectResponse = await fetch(`${req.nextUrl.origin}/api/seo/redirect?from=${encodeURIComponent(pathname)}`, {
-        method: 'GET',
-      })
-      
-      if (redirectResponse.ok) {
-        const redirectData = await redirectResponse.json()
-        if (redirectData.toUrl) {
-          return NextResponse.redirect(new URL(redirectData.toUrl, req.url), redirectData.statusCode || 301)
-        }
-      }
-    } catch (error) {
-      // Continue with normal processing if redirect check fails
-      console.error('Error checking redirects:', error)
-    }
+    // Skip SEO redirects for now to avoid fetch issues in middleware
+    // TODO: Implement direct database check for redirects if needed
 
     // Admin dashboard protection
     if (pathname.startsWith('/dashboard')) {
@@ -112,11 +98,8 @@ export default withAuth(
       }
     }
 
-    // Track page views for SEO analytics (only for main pages)
-    if (pathname.match(/^\/(?:books|blog|academy|about|contact|publishing|services)/)) {
-      // This runs in the background, don't await it
-      trackPageView(req)
-    }
+    // Skip page view tracking in middleware to avoid issues
+    // TODO: Implement client-side tracking instead
 
     return NextResponse.next()
   },
@@ -159,59 +142,6 @@ export default withAuth(
     }
   }
 )
-
-// Background function to track page views
-async function trackPageView(req: any) {
-  try {
-    const userAgent = req.headers.get('user-agent') || ''
-    const referrer = req.headers.get('referer') || ''
-    const forwardedFor = req.headers.get('x-forwarded-for')
-    const realIP = req.headers.get('x-real-ip')
-    const ipAddress = forwardedFor?.split(',')[0] || realIP || req.ip || ''
-    
-    // Simple device detection
-    const deviceType = /Mobile|Android|iPhone|iPad/.test(userAgent) ? 'mobile' : 'desktop'
-    
-    // Simple browser detection
-    let browserName = 'unknown'
-    if (userAgent.includes('Chrome')) browserName = 'chrome'
-    else if (userAgent.includes('Firefox')) browserName = 'firefox'
-    else if (userAgent.includes('Safari')) browserName = 'safari'
-    else if (userAgent.includes('Edge')) browserName = 'edge'
-    
-    // Simple OS detection
-    let osName = 'unknown'
-    if (userAgent.includes('Windows')) osName = 'windows'
-    else if (userAgent.includes('Mac')) osName = 'macos'
-    else if (userAgent.includes('Linux')) osName = 'linux'
-    else if (userAgent.includes('Android')) osName = 'android'
-    else if (userAgent.includes('iOS')) osName = 'ios'
-
-    fetch(`${req.nextUrl.origin}/api/seo/analytics/track`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        pageUrl: req.nextUrl.pathname,
-        pageTitle: '', // This would be set from the client side
-        referrer,
-        userAgent,
-        ipAddress,
-        deviceType,
-        browserName,
-        osName,
-        timestamp: new Date().toISOString(),
-      }),
-    }).catch(error => {
-      // Silently fail analytics tracking
-      console.error('Error tracking page view:', error)
-    })
-  } catch (error) {
-    // Silently fail analytics tracking
-    console.error('Error tracking page view:', error)
-  }
-}
 
 export const config = {
   matcher: [

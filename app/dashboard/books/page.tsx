@@ -6,23 +6,28 @@ import { Badge } from "@/components/ui/badge"
 import { Download, Edit, Plus, Search, TrendingUp } from "lucide-react"
 import Image from "next/image"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import AdminBookCreationForm from "@/components/admin-book-creation-form"
+import Link from "next/link"
 
 export default function BooksDashboard() {
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Book Sales</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Book Management</h2>
         <div className="flex items-center space-x-2">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add New Book
-          </Button>
+          <Link href="/dashboard/books/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Book
+            </Button>
+          </Link>
         </div>
       </div>
       <Tabs defaultValue="overview" className="space-y-4">
         <div className="flex justify-between">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="create">Create Book</TabsTrigger>
             <TabsTrigger value="sales">Sales</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -176,6 +181,9 @@ export default function BooksDashboard() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+        <TabsContent value="create" className="space-y-4">
+          <AdminBookCreationForm />
         </TabsContent>
         <TabsContent value="sales" className="space-y-4">
           <Card>

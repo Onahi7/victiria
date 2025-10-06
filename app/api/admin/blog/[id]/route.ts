@@ -21,7 +21,7 @@ const blogPostSchema = z.object({
 // GET /api/admin/blog/[id] - Get a specific blog post (admin only)
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -33,10 +33,12 @@ export async function GET(
       )
     }
 
+    const { id } = await params
+
     const post = await db
       .select()
       .from(blogPosts)
-      .where(eq(blogPosts.id, params.id))
+      .where(eq(blogPosts.id, id))
       .limit(1)
 
     if (post.length === 0) {
@@ -62,7 +64,7 @@ export async function GET(
 // PUT /api/admin/blog/[id] - Update a blog post (admin only)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -74,6 +76,7 @@ export async function PUT(
       )
     }
 
+    const { id } = await params
     const body = await request.json()
     const validatedData = blogPostSchema.parse(body)
 
@@ -81,7 +84,7 @@ export async function PUT(
     const existingPost = await db
       .select()
       .from(blogPosts)
-      .where(eq(blogPosts.id, params.id))
+      .where(eq(blogPosts.id, id))
       .limit(1)
 
     if (existingPost.length === 0) {
@@ -109,7 +112,7 @@ export async function PUT(
           : existingPost[0].publishedAt,
         updatedAt: new Date(),
       })
-      .where(eq(blogPosts.id, params.id))
+      .where(eq(blogPosts.id, id))
       .returning()
 
     return NextResponse.json({
@@ -134,7 +137,7 @@ export async function PUT(
 // DELETE /api/admin/blog/[id] - Delete a blog post (admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -146,11 +149,13 @@ export async function DELETE(
       )
     }
 
+    const { id } = await params
+
     // Check if the post exists
     const existingPost = await db
       .select()
       .from(blogPosts)
-      .where(eq(blogPosts.id, params.id))
+      .where(eq(blogPosts.id, id))
       .limit(1)
 
     if (existingPost.length === 0) {
@@ -163,7 +168,7 @@ export async function DELETE(
     // Delete the post
     await db
       .delete(blogPosts)
-      .where(eq(blogPosts.id, params.id))
+      .where(eq(blogPosts.id, id))
 
     return NextResponse.json({
       success: true,

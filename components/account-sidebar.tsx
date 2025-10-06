@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+import { VisuallyHidden } from "@/components/ui/visually-hidden"
 import { 
   User, 
   ShoppingBag, 
@@ -165,6 +166,9 @@ function MobileSidebarSheet() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="p-0 w-72">
+        <VisuallyHidden>
+          <SheetTitle>Account Navigation</SheetTitle>
+        </VisuallyHidden>
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">My Account</h2>

@@ -1,0 +1,8 @@
+# Book Cover Uploads
+
+This directory stores uploaded book cover images.
+
+- Front covers: Images of the front of books
+- Back covers: Images of the back of books
+
+Images are automatically resized and optimized for web display.

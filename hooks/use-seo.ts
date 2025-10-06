@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { type PAGE_TYPES } from '@/lib/seo/config'
+import { PAGE_TYPES, type PageType } from '@/lib/seo/config'
 
 interface SEOConfig {
   title?: string
@@ -16,7 +16,7 @@ interface SEOConfig {
 }
 
 interface UseSEOOptions {
-  pageType: PAGE_TYPES
+  pageType: PageType
   id?: string
   dynamicData?: Record<string, any>
   customConfig?: SEOConfig
@@ -111,7 +111,6 @@ export function useSEO({ pageType, id, dynamicData, customConfig }: UseSEOOption
         pageTitle: customConfig?.title || seoData?.title || document.title,
         referrer: document.referrer,
         userAgent: navigator.userAgent,
-        screenResolution: `${screen.width}x${screen.height}`,
         timestamp: new Date().toISOString(),
         pageType,
         ...dynamicData,

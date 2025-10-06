@@ -1,0 +1,8 @@
+runtimes:
+    - go@1.22.3
+    - dart@3.7.2
+    - python@3.11.11
+tools:
+    - revive@1.7.0
+    - dartanalyzer@3.7.2
+    - lizard@1.17.31

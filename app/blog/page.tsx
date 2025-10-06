@@ -10,8 +10,50 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Search, BookOpen, Calendar, Tag } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Blog - EdifyPub',
-  description: 'Read the latest insights, tips, and stories from EdifyPub about writing, publishing, and the creative journey.',
+  title: 'Blog | EdifyPub - Writing, Publishing & Literary Insights',
+  description: 'Explore expert insights, practical tips, and inspiring stories about writing, publishing, and the creative journey. Stay updated with the latest trends in the literary world.',
+  keywords: 'writing blog, publishing tips, author resources, creative writing, book publishing, literary insights, writing advice, publishing industry',
+  authors: [{ name: 'EdifyPub Team' }],
+  creator: 'EdifyPub',
+  publisher: 'EdifyPub',
+  alternates: {
+    canonical: 'https://edifypub.com/blog',
+  },
+  openGraph: {
+    type: 'website',
+    url: 'https://edifypub.com/blog',
+    title: 'EdifyPub Blog - Writing & Publishing Insights',
+    description: 'Read the latest insights, tips, and stories from EdifyPub about writing, publishing, and the creative journey.',
+    siteName: 'EdifyPub',
+    locale: 'en_US',
+    images: [
+      {
+        url: '/edlogo.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'EdifyPub Blog',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@edifypub',
+    creator: '@edifypub',
+    title: 'EdifyPub Blog - Writing & Publishing Insights',
+    description: 'Read the latest insights, tips, and stories from EdifyPub about writing, publishing, and the creative journey.',
+    images: ['/edlogo.jpg'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 }
 
 interface BlogPost {

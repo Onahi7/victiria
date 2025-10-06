@@ -38,8 +38,8 @@ export default function AdminCoursesManagement() {
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [publishedFilter, setPublishedFilter] = useState('')
-  const [levelFilter, setLevelFilter] = useState('')
+  const [publishedFilter, setPublishedFilter] = useState('all')
+  const [levelFilter, setLevelFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
@@ -51,8 +51,8 @@ export default function AdminCoursesManagement() {
         page: page.toString(),
         limit: '10',
         search: searchTerm,
-        published: publishedFilter,
-        level: levelFilter
+        published: publishedFilter === 'all' ? '' : publishedFilter,
+        level: levelFilter === 'all' ? '' : levelFilter
       })
 
       const response = await fetch(`/api/admin/courses?${params}`)
@@ -166,7 +166,7 @@ export default function AdminCoursesManagement() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Courses</SelectItem>
+                <SelectItem value="all">All Courses</SelectItem>
                 <SelectItem value="true">Published</SelectItem>
                 <SelectItem value="false">Draft</SelectItem>
               </SelectContent>
@@ -176,7 +176,7 @@ export default function AdminCoursesManagement() {
                 <SelectValue placeholder="Filter by level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Levels</SelectItem>
+                <SelectItem value="all">All Levels</SelectItem>
                 <SelectItem value="beginner">Beginner</SelectItem>
                 <SelectItem value="intermediate">Intermediate</SelectItem>
                 <SelectItem value="advanced">Advanced</SelectItem>

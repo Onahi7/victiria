@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, text, timestamp, boolean, decimal, jsonb, index, varchar, serial } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, decimal, jsonb, index, varchar, serial, uuid, integer } from 'drizzle-orm/pg-core'
 
 export const seoSettings = pgTable('seo_settings', {
   id: serial('id').primaryKey(),
@@ -46,27 +46,31 @@ export const seoRedirects = pgTable('seo_redirects', {
 }))
 
 export const seoAnalytics = pgTable('seo_analytics', {
-  id: serial('id').primaryKey(),
+  id: uuid('id').primaryKey().defaultRandom(),
   pageUrl: text('page_url').notNull(),
-  pageTitle: varchar('page_title', { length: 255 }),
+  pageTitle: text('page_title'),
   referrer: text('referrer'),
   userAgent: text('user_agent'),
-  ipAddress: varchar('ip_address', { length: 45 }),
-  country: varchar('country', { length: 2 }),
+  ipAddress: varchar('ip_address', { length: 15 }),
+  userId: uuid('user_id'),
+  sessionId: text('session_id'),
+  deviceType: varchar('device_type', { length: 50 }),
+  browser: varchar('browser', { length: 100 }),
+  os: varchar('os', { length: 100 }),
+  country: varchar('country', { length: 100 }),
   city: varchar('city', { length: 100 }),
-  searchQuery: text('search_query'),
-  sessionId: varchar('session_id', { length: 255 }),
-  userId: varchar('user_id', { length: 255 }),
-  deviceType: varchar('device_type', { length: 20 }),
-  browserName: varchar('browser_name', { length: 50 }),
-  osName: varchar('os_name', { length: 50 }),
-  screenResolution: varchar('screen_resolution', { length: 20 }),
-  visitDuration: serial('visit_duration').default(0),
-  pageViews: serial('page_views').default(1),
-  bounceRate: decimal('bounce_rate', { precision: 5, scale: 2 }),
-  exitRate: decimal('exit_rate', { precision: 5, scale: 2 }),
-  conversionRate: decimal('conversion_rate', { precision: 5, scale: 2 }),
-  createdAt: timestamp('created_at').defaultNow(),
+  utmSource: varchar('utm_source', { length: 255 }),
+  utmMedium: varchar('utm_medium', { length: 255 }),
+  utmCampaign: varchar('utm_campaign', { length: 255 }),
+  utmTerm: varchar('utm_term', { length: 255 }),
+  utmContent: varchar('utm_content', { length: 255 }),
+  bounceRate: boolean('bounce_rate').default(false),
+  timeOnPage: integer('time_on_page'),
+  scrollDepth: integer('scroll_depth'),
+  conversionGoal: varchar('conversion_goal', { length: 255 }),
+  isConversion: boolean('is_conversion').default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   pageUrlIdx: index('seo_analytics_page_url_idx').on(table.pageUrl),
   createdAtIdx: index('seo_analytics_created_at_idx').on(table.createdAt),

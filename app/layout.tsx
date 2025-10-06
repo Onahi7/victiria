@@ -22,6 +22,17 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/',
   },
+  manifest: '/site.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.ico', sizes: '48x48', type: 'image/x-icon' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   robots: {
     index: true,
     follow: true,
@@ -46,7 +57,7 @@ export const metadata: Metadata = {
     description: 'Discover inspiring books, writing services, and educational resources on EdifyPub - Your gateway to digital publishing.',
     images: [
       {
-        url: '/placeholder.jpg',
+        url: '/og-image.jpg',
         width: 1200,
         height: 630,
         alt: 'EdifyPub - Digital Publishing Platform',
@@ -58,7 +69,7 @@ export const metadata: Metadata = {
     title: 'EdifyPub - Digital Publishing Platform',
     description: 'Discover inspiring books, writing services, and educational resources on EdifyPub - Your gateway to digital publishing.',
     creator: '@edifypub',
-    images: ['/placeholder.jpg'],
+    images: ['/twitter-image.jpg'],
   },
 }
 

@@ -24,11 +24,25 @@ export default function ManuscriptSubmissionForm({ onSuccess, onError }: Manuscr
     description: "",
     category: "",
     genre: "",
+    subgenre: "",
     wordCount: "",
     language: "english",
+    targetAudience: "",
+    themes: [] as string[],
+    contentWarnings: [] as string[],
+    isSeriesBook: false,
+    seriesTitle: "",
+    bookNumber: "",
+    totalBooksPlanned: "",
+    collaborators: "",
     previouslyPublished: false,
+    publishingRights: "exclusive",
+    expectedReleaseDate: "",
+    marketingBudget: "",
+    authorBio: "",
     manuscript: null as File | null,
     coverImage: null as File | null,
+    synopsis: null as File | null,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -105,7 +119,7 @@ export default function ManuscriptSubmissionForm({ onSuccess, onError }: Manuscr
         formDataToSend.append('coverImage', formData.coverImage)
       }
 
-      const response = await fetch('/api/publishing/submit', {
+      const response = await fetch('/api/publishing/submissions', {
         method: 'POST',
         body: formDataToSend,
       })
@@ -213,9 +227,9 @@ export default function ManuscriptSubmissionForm({ onSuccess, onError }: Manuscr
                 <SelectContent>
                   <SelectItem value="fiction">Fiction</SelectItem>
                   <SelectItem value="non-fiction">Non-Fiction</SelectItem>
-                  <SelectItem value="academic">Academic</SelectItem>
-                  <SelectItem value="children">Children's Books</SelectItem>
                   <SelectItem value="poetry">Poetry</SelectItem>
+                  <SelectItem value="children">Children's Books</SelectItem>
+                  <SelectItem value="young-adult">Young Adult</SelectItem>
                 </SelectContent>
               </Select>
               {errors.category && (
@@ -233,14 +247,20 @@ export default function ManuscriptSubmissionForm({ onSuccess, onError }: Manuscr
                   <SelectValue placeholder="Select genre" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="literary-fiction">Literary Fiction</SelectItem>
                   <SelectItem value="romance">Romance</SelectItem>
-                  <SelectItem value="thriller">Thriller</SelectItem>
-                  <SelectItem value="mystery">Mystery</SelectItem>
+                  <SelectItem value="thriller">Thriller/Mystery</SelectItem>
                   <SelectItem value="fantasy">Fantasy</SelectItem>
                   <SelectItem value="science-fiction">Science Fiction</SelectItem>
-                  <SelectItem value="historical">Historical</SelectItem>
-                  <SelectItem value="biography">Biography</SelectItem>
-                  <SelectItem value="self-help">Self Help</SelectItem>
+                  <SelectItem value="horror">Horror</SelectItem>
+                  <SelectItem value="historical">Historical Fiction</SelectItem>
+                  <SelectItem value="contemporary">Contemporary Fiction</SelectItem>
+                  <SelectItem value="african-literature">African Literature</SelectItem>
+                  <SelectItem value="magical-realism">Magical Realism</SelectItem>
+                  <SelectItem value="crime">Crime/Detective</SelectItem>
+                  <SelectItem value="dystopian">Dystopian</SelectItem>
+                  <SelectItem value="memoir">Memoir/Biography</SelectItem>
+                  <SelectItem value="self-help">Self-Help</SelectItem>
                   <SelectItem value="business">Business</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>

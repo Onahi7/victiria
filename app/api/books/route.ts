@@ -42,7 +42,12 @@ async function getBooksHandler(request: NextRequest) {
     const whereConditions = []
     
     if (status && status !== "all") {
-      whereConditions.push(eq(books.status, status.toLowerCase()))
+      // Validate status against allowed enum values
+      const allowedStatuses = ["published", "draft", "pending_review", "approved", "rejected", "archived"]
+      const normalizedStatus = status.toLowerCase()
+      if (allowedStatuses.includes(normalizedStatus)) {
+        whereConditions.push(eq(books.status, normalizedStatus as any))
+      }
     }
 
     if (category && category !== "All Books") {
@@ -57,27 +62,45 @@ async function getBooksHandler(request: NextRequest) {
 
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined
 
+    // Determine sort column - map virtual columns to actual database columns
+    let sortColumn
+    switch (sortBy) {
+      case 'averageRating':
+        // For averageRating, we'll sort by createdAt and then sort in memory after getting ratings
+        sortColumn = books.createdAt
+        break
+      case 'title':
+        sortColumn = books.title
+        break
+      case 'author':
+        sortColumn = books.author
+        break
+      case 'price':
+        sortColumn = books.price
+        break
+      case 'category':
+        sortColumn = books.category
+        break
+      case 'status':
+        sortColumn = books.status
+        break
+      case 'updatedAt':
+        sortColumn = books.updatedAt
+        break
+      case 'createdAt':
+      default:
+        sortColumn = books.createdAt
+        break
+    }
+
     // Get books with pagination
     const [allBooks, totalCountResult] = await Promise.all([
       trackDbQuery(
         'books.findMany',
-        () => db.select({
-          id: books.id,
-          title: books.title,
-          author: books.author,
-          description: books.description,
-          price: books.price,
-          coverImage: books.coverImage,
-          status: books.status,
-          category: books.category,
-          tags: books.tags,
-          isbn: books.isbn,
-          createdAt: books.createdAt,
-          updatedAt: books.updatedAt
-        })
+        () => db.select()
         .from(books)
         .where(whereClause)
-        .orderBy(sortOrder === 'desc' ? desc(books[sortBy]) : asc(books[sortBy]))
+        .orderBy(sortOrder === 'desc' ? desc(sortColumn) : asc(sortColumn))
         .limit(limit)
         .offset(skip)
       ),
@@ -112,13 +135,25 @@ async function getBooksHandler(request: NextRequest) {
           reviewCount,
           salesCount: 0, // TODO: implement when orders are fixed
           isPopular: false, // TODO: implement based on sales
-          tags: book.tags || []
+          tags: book.tags || [],
+          hasDownload: !!(book.bookFile || book.digitalDownload),
+          canDownload: book.isFree || false, // Free books can be downloaded immediately
+          downloadUrl: book.isFree ? `/api/books/${book.id}/download` : null
         }
       })
     )
 
+    // Sort by averageRating if requested (since we can't do this in SQL)
+    let finalBooks = booksWithMetadata
+    if (sortBy === 'averageRating') {
+      finalBooks = booksWithMetadata.sort((a, b) => {
+        const comparison = b.averageRating - a.averageRating
+        return sortOrder === 'desc' ? comparison : -comparison
+      })
+    }
+
     const result = {
-      books: booksWithMetadata,
+      books: finalBooks,
       pagination: {
         page,
         limit,
@@ -156,25 +191,46 @@ async function getBooksHandler(request: NextRequest) {
 
 const bookSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
+  author: z.string().min(1, "Author is required").max(100, "Author name too long"),
   description: z.string().min(10, "Description must be at least 10 characters").max(2000, "Description too long"),
-  price: z.number().min(0, "Price must be positive").max(1000000, "Price too high"),
+  isFree: z.boolean().default(false),
+  price: z.number().min(0, "Price must be positive").max(1000000, "Price too high").optional(),
+  priceUsd: z.number().min(0, "USD price must be positive").max(1000000, "USD price too high").optional(),
+  priceNgn: z.number().min(0, "NGN price must be positive").max(1000000, "NGN price too high").optional(),
   coverImage: z.string().url().optional(),
+  frontCoverImage: z.string().url().optional(),
+  backCoverImage: z.string().url().optional(),
+  bookFile: z.string().url().optional(), // PDF/EPUB file URL
+  digitalDownload: z.string().url().optional(), // Alternative download link
   category: z.string().min(1, "Category is required"),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
+  status: z.enum(["draft", "published", "pending_review", "approved", "rejected", "archived"]).default("draft"),
   tags: z.array(z.string()).optional(),
   isbn: z.string().optional(),
   publisher: z.string().optional(),
   publishedYear: z.number().optional(),
   pageCount: z.number().optional(),
-  language: z.string().default("English")
-})
+  language: z.string().default("English"),
+  slug: z.string().optional() // Allow manual slug override
+}).refine(
+  (data) => {
+    // If the book is not free, at least one price must be provided
+    if (!data.isFree) {
+      return data.price || data.priceUsd || data.priceNgn;
+    }
+    return true; // Free books don't need prices
+  },
+  {
+    message: "Paid books must have at least one price (price, priceUsd, or priceNgn)",
+    path: ["price"]
+  }
+)
 
 // POST create new book (admin only)
 async function createBookHandler(request: NextRequest) {
   try {
     const session = await auth()
     
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session || session.user.role !== "admin") {
       return NextResponse.json(
         { success: false, error: "Unauthorized. Admin access required." },
         { status: 401 }
@@ -183,6 +239,24 @@ async function createBookHandler(request: NextRequest) {
 
     const body = await request.json()
     const bookData = bookSchema.parse(body)
+
+    // Generate slug from title if not provided
+    let slug = bookData.slug || generateSlug(bookData.title)
+    
+    // Ensure slug is unique
+    let slugCounter = 0
+    const originalSlug = slug
+    while (true) {
+      const existingSlugBook = await trackDbQuery(
+        'books.findFirst.slug',
+        () => db.select().from(books).where(eq(books.slug, slug)).limit(1)
+      )
+      
+      if (existingSlugBook.length === 0) break
+      
+      slugCounter++
+      slug = `${originalSlug}-${slugCounter}`
+    }
 
     // Check for duplicate titles
     const existingBook = await trackDbQuery(
@@ -204,12 +278,37 @@ async function createBookHandler(request: NextRequest) {
 
     const newBook = await trackDbQuery(
       'books.create',
-      () => db.insert(books).values({
-        ...bookData,
-        tags: bookData.tags ? JSON.stringify(bookData.tags) : null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }).returning()
+      () => {
+        const insertData: any = {
+          title: bookData.title,
+          author: bookData.author,
+          description: bookData.description,
+          isFree: bookData.isFree,
+          price: bookData.isFree ? '0' : (bookData.price?.toString() || '0'),
+          category: bookData.category,
+          status: bookData.status,
+          language: bookData.language,
+          slug: slug,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+
+        // Add optional fields only if they exist
+        if (!bookData.isFree && bookData.priceUsd) insertData.priceUsd = bookData.priceUsd.toString()
+        if (!bookData.isFree && bookData.priceNgn) insertData.priceNgn = bookData.priceNgn.toString()
+        if (bookData.coverImage) insertData.coverImage = bookData.coverImage
+        if (bookData.frontCoverImage) insertData.frontCoverImage = bookData.frontCoverImage
+        if (bookData.backCoverImage) insertData.backCoverImage = bookData.backCoverImage
+        if (bookData.bookFile) insertData.bookFile = bookData.bookFile
+        if (bookData.digitalDownload) insertData.digitalDownload = bookData.digitalDownload
+        if (bookData.tags) insertData.tags = bookData.tags
+        if (bookData.isbn) insertData.isbn = bookData.isbn
+        if (bookData.publisher) insertData.publisher = bookData.publisher
+        if (bookData.publishedYear) insertData.publishedYear = bookData.publishedYear
+        if (bookData.pageCount) insertData.pageCount = bookData.pageCount
+
+        return db.insert(books).values(insertData).returning()
+      }
     )
 
     // Invalidate relevant caches
@@ -240,9 +339,10 @@ async function createBookHandler(request: NextRequest) {
 function generateSlug(title: string): string {
   return title
     .toLowerCase()
-    .replace(/[^a-z0-9 -]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
+    .replace(/[^a-z0-9 -]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
     .trim()
 }
 

@@ -15,9 +15,14 @@ interface Book {
   title: string
   description: string
   price: number
-  coverImage?: string
+  priceUsd?: number
+  priceNgn?: number
+  coverImage?: string // Legacy field
+  frontCoverImage?: string
+  backCoverImage?: string
   category: string
   status: string
+  slug: string
   createdAt: string
 }
 
@@ -184,7 +189,7 @@ export default function BooksPage() {
                       <div className="relative h-[300px] sm:h-[350px] md:h-[400px] overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent z-10"></div>
                         <Image
-                          src={book.coverImage || "/placeholder.svg"}
+                          src={book.frontCoverImage || book.coverImage || "/placeholder.svg"}
                           alt={`${book.title} book cover`}
                           fill
                           className="object-cover transition-transform duration-700 group-hover:scale-110"
@@ -218,7 +223,19 @@ export default function BooksPage() {
                             </span>
                           </div>
                           <span className="font-bold text-base sm:text-lg text-purple-600 dark:text-purple-400">
-                            ₦{book.price.toLocaleString()}
+                            {book.priceNgn && book.priceUsd ? (
+                              <>
+                                <span className="text-sm">₦{Number(book.priceNgn).toLocaleString()}</span>
+                                <span className="text-muted-foreground mx-1">|</span>
+                                <span className="text-sm">${Number(book.priceUsd).toLocaleString()}</span>
+                              </>
+                            ) : book.priceNgn ? (
+                              `₦${Number(book.priceNgn).toLocaleString()}`
+                            ) : book.priceUsd ? (
+                              `$${Number(book.priceUsd).toLocaleString()}`
+                            ) : (
+                              `₦${book.price.toLocaleString()}`
+                            )}
                           </span>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">

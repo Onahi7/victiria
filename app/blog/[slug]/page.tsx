@@ -6,11 +6,14 @@ import { eq, and, ne } from 'drizzle-orm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Calendar, Clock, User, ArrowLeft, Share2, BookOpen, Tag } from 'lucide-react'
+import { Calendar, Clock, User, ArrowLeft, BookOpen, Tag } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import Image from 'next/image'
 import BlogPostCard from '@/components/blog-post-card'
+import BlogSocialShare from '@/components/blog-social-share'
+import BlogComments from '@/components/blog-comments'
+import BlogStructuredData from '@/components/blog-structured-data'
 
 interface BlogPost {
   id: string
@@ -114,8 +117,9 @@ async function getRelatedPosts(postId: string, category: string | null): Promise
   }))
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const post = await getBlogPost(params.slug)
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const post = await getBlogPost(slug)
 
   if (!post) {
     return {
@@ -124,34 +128,72 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     }
   }
 
+  const url = 'https://edifypub.com' // Replace with your actual domain
+  const ogImage = post.coverImage || '/edlogo.jpg'
+  
   return {
-    title: post.seoTitle || `${post.title} - EdifyPub`,
-    description: post.seoDescription || post.excerpt || 'Read this blog post by EdifyPub',
+    title: post.seoTitle || `${post.title} | EdifyPub Blog`,
+    description: post.seoDescription || post.excerpt || `Read ${post.title} by ${post.author?.name || 'EdifyPub Team'}`,
+    keywords: Array.isArray(post.tags) ? post.tags.join(', ') : undefined,
+    authors: post.author ? [{ name: post.author.name }] : [{ name: 'EdifyPub Team' }],
+    creator: post.author?.name || 'EdifyPub Team',
+    publisher: 'EdifyPub',
+    alternates: {
+      canonical: `${url}/blog/${post.slug}`,
+    },
     openGraph: {
+      type: 'article',
+      url: `${url}/blog/${post.slug}`,
       title: post.title,
       description: post.excerpt || 'Read this blog post by EdifyPub',
-      type: 'article',
+      siteName: 'EdifyPub',
+      locale: 'en_US',
       publishedTime: post.publishedAt || undefined,
+      modifiedTime: post.updatedAt,
       authors: post.author ? [post.author.name] : ['EdifyPub Team'],
-      images: post.coverImage ? [post.coverImage] : undefined,
+      section: post.category || 'Publishing',
+      tags: Array.isArray(post.tags) ? post.tags : undefined,
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: post.title,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
+      site: '@edifypub',
+      creator: '@edifypub',
       title: post.title,
       description: post.excerpt || 'Read this blog post by EdifyPub',
-      images: post.coverImage ? [post.coverImage] : undefined,
+      images: [ogImage],
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
     },
   }
 }
 
-export default async function BlogPostPage({ params }: { params: { slug: string } }) {
-  const post = await getBlogPost(params.slug)
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const post = await getBlogPost(slug)
 
   if (!post) {
     notFound()
   }
 
   const relatedPosts = await getRelatedPosts(post.id, post.category)
+  const url = 'https://edifypub.com' // Replace with your actual domain
 
   const estimateReadTime = (content: string) => {
     const wordsPerMinute = 200
@@ -175,7 +217,9 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <>
+      <BlogStructuredData post={post} url={url} />
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -238,10 +282,12 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
                   </div>
                 </div>
                 
-                <Button variant="outline" size="sm">
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share
-                </Button>
+                <BlogSocialShare 
+                  title={post.title}
+                  excerpt={post.excerpt}
+                  slug={post.slug}
+                  url={`${url}/blog/${post.slug}`}
+                />
               </div>
             </div>
             
@@ -314,6 +360,9 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
                 </div>
               </CardContent>
             </Card>
+
+            {/* Comments Section */}
+            <BlogComments postId={post.id} postSlug={post.slug} />
           </div>
         </div>
       </section>
@@ -335,6 +384,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           </div>
         </section>
       )}
-    </div>
+      </div>
+    </>
   )
 }

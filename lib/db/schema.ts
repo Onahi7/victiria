@@ -23,6 +23,8 @@ export const postStatusEnum = pgEnum('post_status', ['draft', 'published', 'arch
 export const eventTypeEnum = pgEnum('event_type', ['workshop', 'webinar', 'book_launch', 'masterclass', 'meet_greet', 'conference'])
 export const eventStatusEnum = pgEnum('event_status', ['draft', 'published', 'cancelled', 'completed'])
 export const registrationStatusEnum = pgEnum('registration_status', ['registered', 'attended', 'cancelled', 'no_show'])
+export const couponTypeEnum = pgEnum('coupon_type', ['percentage', 'fixed'])
+export const couponAppliesToEnum = pgEnum('coupon_applies_to', ['all', 'books', 'courses', 'specific'])
 
 // Users & Authentication
 export const users = pgTable('users', {
@@ -80,13 +82,19 @@ export const books = pgTable('books', {
   authorId: uuid('author_id').references(() => users.id), // Link to actual user who published
   description: text('description'),
   excerpt: text('excerpt'),
-  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
-  coverImage: text('cover_image'),
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(), // Legacy field
+  priceUsd: decimal('price_usd', { precision: 10, scale: 2 }), // USD price for PayPal/Stripe
+  priceNgn: decimal('price_ngn', { precision: 10, scale: 2 }), // NGN price for Paystack
+  coverImage: text('cover_image'), // Legacy field, use frontCoverImage instead
+  frontCoverImage: text('front_cover_image'), // Front cover image URL
+  backCoverImage: text('back_cover_image'), // Back cover image URL
   status: bookStatusEnum('status').default('draft').notNull(),
   category: varchar('category', { length: 100 }),
+  slug: varchar('slug', { length: 255 }).notNull().unique(),
   tags: jsonb('tags'), // Array of tag strings
   stock: integer('stock').default(0),
   isAvailable: boolean('is_available').default(true),
+  isFree: boolean('is_free').default(false),
   digitalDownload: text('digital_download'),
   bookFile: text('book_file'), // PDF/EPUB file URL
   isbn: varchar('isbn', { length: 50 }),
@@ -306,6 +314,72 @@ export const wishlists = pgTable('wishlists', {
   addedAt: timestamp('added_at').defaultNow().notNull(),
 })
 
+export const cartItems = pgTable('cart_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  bookId: uuid('book_id').notNull().references(() => books.id, { onDelete: 'cascade' }),
+  quantity: integer('quantity').default(1).notNull(),
+  addedAt: timestamp('added_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const coupons = pgTable('coupons', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  code: varchar('code', { length: 50 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  type: couponTypeEnum('type').notNull(),
+  value: decimal('value', { precision: 10, scale: 2 }).notNull(),
+  minOrderAmount: decimal('min_order_amount', { precision: 10, scale: 2 }).default('0'),
+  maxDiscountAmount: decimal('max_discount_amount', { precision: 10, scale: 2 }),
+  usageLimit: integer('usage_limit'),
+  usedCount: integer('used_count').default(0),
+  userLimit: integer('user_limit').default(1),
+  appliesTo: couponAppliesToEnum('applies_to').default('all').notNull(),
+  applicableItems: jsonb('applicable_items'), // Array of book/course IDs
+  isActive: boolean('is_active').default(true),
+  startsAt: timestamp('starts_at').notNull(),
+  expiresAt: timestamp('expires_at'),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const couponUsage = pgTable('coupon_usage', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  couponId: uuid('coupon_id').notNull().references(() => coupons.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  discountAmount: decimal('discount_amount', { precision: 10, scale: 2 }).notNull(),
+  usedAt: timestamp('used_at').defaultNow().notNull(),
+})
+
+export const bookPreorders = pgTable('book_preorders', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  bookId: uuid('book_id').notNull().references(() => books.id, { onDelete: 'cascade' }),
+  preorderStart: timestamp('preorder_start').notNull(),
+  preorderEnd: timestamp('preorder_end').notNull(),
+  releaseDate: timestamp('release_date').notNull(),
+  earlyAccessDiscount: decimal('early_access_discount', { precision: 5, scale: 2 }).default('0'),
+  maxPreorderQuantity: integer('max_preorder_quantity'),
+  currentPreorderCount: integer('current_preorder_count').default(0),
+  preorderBenefits: jsonb('preorder_benefits'), // Array of benefits
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const preorderPurchases = pgTable('preorder_purchases', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  preorderId: uuid('preorder_id').notNull().references(() => bookPreorders.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  quantity: integer('quantity').default(1).notNull(),
+  discountApplied: decimal('discount_applied', { precision: 10, scale: 2 }).default('0'),
+  notificationSent: boolean('notification_sent').default(false),
+  purchasedAt: timestamp('purchased_at').defaultNow().notNull(),
+})
+
 export const reviews = pgTable('reviews', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -356,6 +430,17 @@ export const blogPosts = pgTable('blog_posts', {
   seoTitle: varchar('seo_title', { length: 255 }),
   seoDescription: text('seo_description'),
   publishedAt: timestamp('published_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const blogComments = pgTable('blog_comments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  postId: uuid('post_id').notNull().references(() => blogPosts.id, { onDelete: 'cascade' }),
+  authorId: uuid('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  parentId: uuid('parent_id').references((): any => blogComments.id, { onDelete: 'cascade' }),
+  likes: integer('likes').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
@@ -485,14 +570,152 @@ export const courseReviews = pgTable('course_reviews', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
-// Newsletter
+// Newsletter & Email Templates
 export const newsletterSubscribers = pgTable('newsletter_subscribers', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   name: varchar('name', { length: 255 }),
+  phone: varchar('phone', { length: 20 }),
+  source: varchar('source', { length: 50 }).default('direct'), // free_download, homepage, blog, etc.
+  status: varchar('status', { length: 20 }).default('active'), // active, unsubscribed, bounced
   isActive: boolean('is_active').default(true),
   subscribedAt: timestamp('subscribed_at').defaultNow().notNull(),
   unsubscribedAt: timestamp('unsubscribed_at'),
+  preferences: jsonb('preferences').default('{}'), // email preferences, frequency, etc.
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// Free Downloads Tracking
+export const freeDownloads = pgTable('free_downloads', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  bookId: uuid('book_id').notNull().references(() => books.id, { onDelete: 'cascade' }),
+  downloadedAt: timestamp('downloaded_at').defaultNow().notNull(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  source: varchar('source', { length: 50 }).default('direct'), // direct, newsletter, social, etc.
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const emailTemplates = pgTable('email_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull().unique(),
+  subject: varchar('subject', { length: 500 }).notNull(),
+  content: text('content').notNull(),
+  variables: jsonb('variables'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// SEO & Analytics Tables
+export const seoSettings = pgTable('seo_settings', {
+  id: serial('id').primaryKey(),
+  pageType: varchar('page_type', { length: 50 }).notNull(),
+  pageSlug: varchar('page_slug', { length: 255 }), // for specific pages like book slugs
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description').notNull(),
+  keywords: jsonb('keywords'),
+  canonicalUrl: text('canonical_url'),
+  ogTitle: varchar('og_title', { length: 255 }),
+  ogDescription: text('og_description'),
+  ogImage: text('og_image'),
+  ogType: varchar('og_type', { length: 50 }).default('website'),
+  twitterCard: varchar('twitter_card', { length: 50 }).default('summary_large_image'),
+  twitterSite: varchar('twitter_site', { length: 100 }),
+  twitterCreator: varchar('twitter_creator', { length: 100 }),
+  robotsIndex: boolean('robots_index').default(true),
+  robotsFollow: boolean('robots_follow').default(true),
+  structuredData: jsonb('structured_data'),
+  priority: decimal('priority', { precision: 3, scale: 2 }).default('0.5'),
+  changeFreq: varchar('change_freq', { length: 20 }).default('monthly'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  lastModified: timestamp('last_modified'),
+})
+
+export const seoRedirects = pgTable('seo_redirects', {
+  id: serial('id').primaryKey(),
+  fromUrl: text('from_url').notNull().unique(),
+  toUrl: text('to_url').notNull(),
+  statusCode: varchar('status_code', { length: 3 }).default('301'),
+  isActive: boolean('is_active').default(true),
+  hitCount: integer('hit_count').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+})
+
+export const seoAnalytics = pgTable('seo_analytics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pageUrl: text('page_url').notNull(),
+  pageTitle: text('page_title'),
+  referrer: text('referrer'),
+  userAgent: text('user_agent'),
+  ipAddress: varchar('ip_address', { length: 15 }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  sessionId: text('session_id'),
+  deviceType: varchar('device_type', { length: 50 }),
+  browser: varchar('browser', { length: 100 }),
+  os: varchar('os', { length: 100 }),
+  country: varchar('country', { length: 100 }),
+  city: varchar('city', { length: 100 }),
+  utmSource: varchar('utm_source', { length: 255 }),
+  utmMedium: varchar('utm_medium', { length: 255 }),
+  utmCampaign: varchar('utm_campaign', { length: 255 }),
+  utmTerm: varchar('utm_term', { length: 255 }),
+  utmContent: varchar('utm_content', { length: 255 }),
+  bounceRate: boolean('bounce_rate').default(false),
+  timeOnPage: integer('time_on_page'),
+  scrollDepth: integer('scroll_depth'),
+  conversionGoal: varchar('conversion_goal', { length: 255 }),
+  isConversion: boolean('is_conversion').default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const seoMetrics = pgTable('seo_metrics', {
+  id: serial('id').primaryKey(),
+  pageUrl: text('page_url').notNull(),
+  date: timestamp('date').notNull(),
+  organicTraffic: integer('organic_traffic').default(0),
+  clickThroughRate: decimal('click_through_rate', { precision: 5, scale: 2 }).default('0.00'),
+  averagePosition: decimal('average_position', { precision: 5, scale: 2 }).default('0.00'),
+  impressions: integer('impressions').default(0),
+  clicks: integer('clicks').default(0),
+  bounceRate: decimal('bounce_rate', { precision: 5, scale: 2 }).default('0.00'),
+  avgSessionDuration: integer('avg_session_duration').default(0),
+  pageLoadTime: decimal('page_load_time', { precision: 5, scale: 2 }).default('0.00'),
+  mobileUsability: decimal('mobile_usability', { precision: 5, scale: 2 }).default('0.00'),
+  coreWebVitals: jsonb('core_web_vitals'),
+  createdAt: timestamp('created_at').defaultNow(),
+})
+
+export const seoKeywords = pgTable('seo_keywords', {
+  id: serial('id').primaryKey(),
+  keyword: varchar('keyword', { length: 255 }).notNull(),
+  pageUrl: text('page_url').notNull(),
+  position: integer('position').default(0),
+  searchVolume: integer('search_volume').default(0),
+  competition: decimal('competition', { precision: 3, scale: 2 }).default('0.00'),
+  cpc: decimal('cpc', { precision: 10, scale: 2 }).default('0.00'),
+  difficulty: decimal('difficulty', { precision: 3, scale: 2 }).default('0.00'),
+  isTracked: boolean('is_tracked').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+})
+
+export const seoSitemaps = pgTable('seo_sitemaps', {
+  id: serial('id').primaryKey(),
+  url: text('url').notNull(),
+  lastmod: timestamp('lastmod'),
+  changefreq: varchar('changefreq', { length: 20 }).default('monthly'),
+  priority: decimal('priority', { precision: 3, scale: 2 }).default('0.5'),
+  pageType: varchar('page_type', { length: 50 }).notNull(),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 })
 
 // Relations
@@ -515,6 +738,22 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   authorPayouts: many(authorPayouts),
   sentMessages: many(authorMessages, { relationName: 'sentMessages' }),
   receivedMessages: many(authorMessages, { relationName: 'receivedMessages' }),
+  cartItems: many(cartItems),
+  createdCoupons: many(coupons),
+  couponUsage: many(couponUsage),
+  preorderPurchases: many(preorderPurchases),
+  freeDownloads: many(freeDownloads),
+}))
+
+export const freeDownloadsRelations = relations(freeDownloads, ({ one }) => ({
+  user: one(users, {
+    fields: [freeDownloads.userId],
+    references: [users.id],
+  }),
+  book: one(books, {
+    fields: [freeDownloads.bookId],
+    references: [books.id],
+  }),
 }))
 
 export const booksRelations = relations(books, ({ many, one }) => ({
@@ -530,6 +769,8 @@ export const booksRelations = relations(books, ({ many, one }) => ({
   }),
   revenues: many(authorRevenues),
   submissions: many(bookSubmissions),
+  preorders: many(bookPreorders),
+  freeDownloads: many(freeDownloads),
 }))
 
 export const bookSubmissionsRelations = relations(bookSubmissions, ({ one, many }) => ({
@@ -700,5 +941,62 @@ export const eventRegistrationsRelations = relations(eventRegistrations, ({ one 
   user: one(users, {
     fields: [eventRegistrations.userId],
     references: [users.id],
+  }),
+}))
+
+export const cartItemsRelations = relations(cartItems, ({ one }) => ({
+  user: one(users, {
+    fields: [cartItems.userId],
+    references: [users.id],
+  }),
+  book: one(books, {
+    fields: [cartItems.bookId],
+    references: [books.id],
+  }),
+}))
+
+export const couponsRelations = relations(coupons, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [coupons.createdBy],
+    references: [users.id],
+  }),
+  usage: many(couponUsage),
+}))
+
+export const couponUsageRelations = relations(couponUsage, ({ one }) => ({
+  coupon: one(coupons, {
+    fields: [couponUsage.couponId],
+    references: [coupons.id],
+  }),
+  user: one(users, {
+    fields: [couponUsage.userId],
+    references: [users.id],
+  }),
+  order: one(orders, {
+    fields: [couponUsage.orderId],
+    references: [orders.id],
+  }),
+}))
+
+export const bookPreordersRelations = relations(bookPreorders, ({ one, many }) => ({
+  book: one(books, {
+    fields: [bookPreorders.bookId],
+    references: [books.id],
+  }),
+  purchases: many(preorderPurchases),
+}))
+
+export const preorderPurchasesRelations = relations(preorderPurchases, ({ one }) => ({
+  preorder: one(bookPreorders, {
+    fields: [preorderPurchases.preorderId],
+    references: [bookPreorders.id],
+  }),
+  user: one(users, {
+    fields: [preorderPurchases.userId],
+    references: [users.id],
+  }),
+  order: one(orders, {
+    fields: [preorderPurchases.orderId],
+    references: [orders.id],
   }),
 }))
