@@ -6,24 +6,33 @@ import { eq, desc } from 'drizzle-orm'
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://edifypub.com' // Replace with your actual domain
 
-  // Get all published blog posts
-  const posts = await db
-    .select({
-      slug: blogPosts.slug,
-      updatedAt: blogPosts.updatedAt,
-    })
-    .from(blogPosts)
-    .where(eq(blogPosts.status, 'published'))
-    .orderBy(desc(blogPosts.updatedAt))
+  let posts: Array<{ slug: string; updatedAt: Date | null }> = []
+  let publishedBooks: Array<{ slug: string; updatedAt: Date | null }> = []
 
-  // Get all published books
-  const publishedBooks = await db
-    .select({
-      slug: books.slug,
-      updatedAt: books.updatedAt,
-    })
-    .from(books)
-    .where(eq(books.status, 'published'))
+  // Try to get dynamic content from database, but don't fail if DB is unavailable
+  try {
+    // Get all published blog posts
+    posts = await db
+      .select({
+        slug: blogPosts.slug,
+        updatedAt: blogPosts.updatedAt,
+      })
+      .from(blogPosts)
+      .where(eq(blogPosts.status, 'published'))
+      .orderBy(desc(blogPosts.updatedAt))
+
+    // Get all published books
+    publishedBooks = await db
+      .select({
+        slug: books.slug,
+        updatedAt: books.updatedAt,
+      })
+      .from(books)
+      .where(eq(books.status, 'published'))
+  } catch (error) {
+    // If database is unavailable during build, just return static pages
+    console.warn('Database unavailable during sitemap generation, returning static pages only')
+  }
 
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
@@ -80,7 +89,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Blog post pages
   const blogPages: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${baseUrl}/blog/${post.slug}`,
-    lastModified: post.updatedAt,
+    lastModified: post.updatedAt ?? undefined,
     changeFrequency: 'weekly' as const,
     priority: 0.7,
   }))
@@ -88,7 +97,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Book pages
   const bookPages: MetadataRoute.Sitemap = publishedBooks.map((book) => ({
     url: `${baseUrl}/books/${book.slug}`,
-    lastModified: book.updatedAt,
+    lastModified: book.updatedAt ?? undefined,
     changeFrequency: 'weekly' as const,
     priority: 0.8,
   }))
